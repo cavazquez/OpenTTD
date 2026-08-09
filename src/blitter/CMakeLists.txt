@@ -38,6 +38,19 @@ add_files(
     CONDITION NOT OPTION_DEDICATED AND OPENGL_FOUND
 )
 
+# openttdrs headless raster oracle
+add_files(
+    32bpp_base.cpp
+    32bpp_base.hpp
+    32bpp_simple.cpp
+    32bpp_simple.hpp
+    8bpp_base.cpp
+    8bpp_base.hpp
+    8bpp_simple.cpp
+    8bpp_simple.hpp
+    CONDITION OPTION_DEDICATED AND OPENTTDRS_HEADLESS_RASTER
+)
+
 add_files(
     base.hpp
     common.hpp

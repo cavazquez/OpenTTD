@@ -17,6 +17,7 @@
 #include "viewport_func.h"
 #include "command_func.h"
 #include "landscape.h"
+#include "world_draw_export.h"
 #include "void_map.h"
 #include "tgp.h"
 #include "genworld.h"
@@ -450,7 +451,29 @@ void DrawFoundation(TileInfo *ti, Foundation f)
 	/* Two part foundations must be drawn separately */
 	assert(f != Foundation::SteepBoth);
 
-	uint sprite_block = GetFoundationSpriteBlock(ti->tile);
+	auto [slope, z] = GetFoundationPixelSlope(ti->tile);
+	const bool has_nw = HasFoundation(ti->tile, slope, z, DiagDirection::NW);
+	const bool has_ne = HasFoundation(ti->tile, slope, z, DiagDirection::NE);
+
+	/* Las mismas ocho alturas que usa HasFoundation(). La traza
+	 * conserva los valores antes de reducirlos al booleano para que el
+	 * cliente pueda contrastar orientación y fundamento de cada vecino. */
+	auto [nw_w_here, nw_n_here] = GetSlopePixelZOnEdge(slope, DiagDirection::NW, z);
+	auto [nw_slope, nw_z] = GetFoundationPixelSlope(TileAddByDiagDir(ti->tile, DiagDirection::NW));
+	auto [nw_w_neighbour, nw_n_neighbour] = GetSlopePixelZOnEdge(nw_slope, DiagDirection::SE, nw_z);
+	auto [ne_e_here, ne_n_here] = GetSlopePixelZOnEdge(slope, DiagDirection::NE, z);
+	auto [ne_slope, ne_z] = GetFoundationPixelSlope(TileAddByDiagDir(ti->tile, DiagDirection::NE));
+	auto [ne_e_neighbour, ne_n_neighbour] = GetSlopePixelZOnEdge(ne_slope, DiagDirection::SW, ne_z);
+
+	uint sprite_block = 0;
+	if (!has_nw) sprite_block += 1;
+	if (!has_ne) sprite_block += 2;
+	OpenttdrsWorldDrawRecordFoundation(
+		static_cast<uint8_t>(f), static_cast<uint8_t>(slope),
+		static_cast<uint32_t>(z / TILE_HEIGHT), static_cast<uint8_t>(sprite_block), has_nw, has_ne,
+		nw_w_here, nw_n_here, nw_w_neighbour, nw_n_neighbour,
+		ne_e_here, ne_n_here, ne_e_neighbour, ne_n_neighbour
+	);
 
 	/* Use the original slope sprites if NW and NE borders should be visible */
 	SpriteID leveled_base = (sprite_block == 0 ? (int)SPR_FOUNDATION_BASE : (SPR_SLOPES_VIRTUAL_BASE + sprite_block * TRKFOUND_BLOCK_SIZE));

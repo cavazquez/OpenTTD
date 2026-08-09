@@ -7,6 +7,10 @@
 
 /** @file afterload.cpp Code updating data after game load. */
 
+#include "../world_screenshot_export.h"
+#include "../world_draw_export.h"
+#include "../world_semantic_export.h"
+#include "../world_raw_export.h"
 #include "../stdafx.h"
 #include "../void_map.h"
 #include "../signs_base.h"
@@ -3455,6 +3459,20 @@ bool AfterLoadGame()
 		}
 	}
 
+	if (!OpenttdrsMaybeExportWorldRaw("")) {
+		Debug(misc, 0, "openttdrs world-raw export failed");
+	}
+	if (!OpenttdrsMaybeExportWorldSemantic("")) {
+		Debug(misc, 0, "openttdrs world-semantic export failed");
+	}
+	if (!OpenttdrsMaybeStartWorldDraw("")) {
+		Debug(misc, 0, "openttdrs world-draw export failed to start");
+	} else if (OpenttdrsWorldDrawCaptureActive() && !OpenttdrsCaptureWorldDraw()) {
+		Debug(misc, 0, "openttdrs world-draw capture failed");
+	}
+	if (!OpenttdrsMaybeCaptureWorldScreenshot()) {
+		Debug(misc, 0, "openttdrs world-screenshot capture failed");
+	}
 	return true;
 }
 
