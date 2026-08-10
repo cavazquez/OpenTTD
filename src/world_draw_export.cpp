@@ -286,7 +286,15 @@ void OpenttdrsWorldDrawRecordFoundation(
 	});
 }
 
-void OpenttdrsWorldDrawRecordTileSprite(uint32_t image, uint32_t palette, int32_t x, int32_t y, int32_t z)
+void OpenttdrsWorldDrawRecordTileSprite(
+	uint32_t image,
+	uint32_t palette,
+	int32_t x,
+	int32_t y,
+	int32_t z,
+	int32_t extra_offs_x,
+	int32_t extra_offs_y
+)
 {
 	auto &state = _openttdrs_world_draw;
 	if (!OpenttdrsWorldDrawCaptureActive() || !state.in_tile) return;
@@ -295,7 +303,7 @@ void OpenttdrsWorldDrawRecordTileSprite(uint32_t image, uint32_t palette, int32_
 	row["palette"] = palette;
 	row["world"] = {{"x", x}, {"y", y}, {"z", z}};
 	row["bounds"] = nullptr;
-	row["offset"] = {{"x", 0}, {"y", 0}, {"z", 0}};
+	row["offset"] = {{"x", extra_offs_x}, {"y", extra_offs_y}, {"z", 0}};
 	row["parent_ordinal"] = nullptr;
 	row["transparent"] = false;
 	Emit(std::move(row));

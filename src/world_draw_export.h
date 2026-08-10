@@ -67,7 +67,23 @@ void OpenttdrsWorldDrawRecordFoundation(
 	int32_t ne_n_neighbour
 );
 
-void OpenttdrsWorldDrawRecordTileSprite(uint32_t image, uint32_t palette, int32_t x, int32_t y, int32_t z);
+/**
+ * Records a ground primitive exactly as `AddTileSpriteToDraw` receives it.
+ *
+ * `extra_offs_*` are screen-pixel offsets already normalized to ZOOM_BASE.
+ * They are significant for sloped rail reservation overlays: omitting them
+ * made the parity trace claim that an actually shifted C++ sprite was at the
+ * unshifted ground position.
+ */
+void OpenttdrsWorldDrawRecordTileSprite(
+	uint32_t image,
+	uint32_t palette,
+	int32_t x,
+	int32_t y,
+	int32_t z,
+	int32_t extra_offs_x,
+	int32_t extra_offs_y
+);
 void OpenttdrsWorldDrawRecordSortable(
 	uint32_t image,
 	uint32_t palette,

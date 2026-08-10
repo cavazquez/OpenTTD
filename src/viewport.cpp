@@ -508,7 +508,7 @@ void HandleZoomMessage(Window *w, const Viewport &vp, WidgetID widget_zoom_in, W
 static void AddTileSpriteToDraw(SpriteID image, PaletteID pal, int32_t x, int32_t y, int z, const SubSprite *sub = nullptr, int extra_offs_x = 0, int extra_offs_y = 0)
 {
 	if (OpenttdrsWorldDrawCaptureActive()) {
-		OpenttdrsWorldDrawRecordTileSprite(image, pal, x, y, z);
+		OpenttdrsWorldDrawRecordTileSprite(image, pal, x, y, z, extra_offs_x, extra_offs_y);
 		return;
 	}
 	assert((image & SPRITE_MASK) < MAX_SPRITES);
