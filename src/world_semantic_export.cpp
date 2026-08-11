@@ -10,6 +10,7 @@
 
 #include "bridge_map.h"
 #include "map_func.h"
+#include "object_map.h"
 #include "openttd.h"
 #include "saveload/saveload.h"
 #include "tile_map.h"
@@ -314,6 +315,7 @@ json ObjectDetails(Tile tile)
 	return {
 		{"family", "object"},
 		{"object_id", object_id},
+		{"object_type", static_cast<uint32_t>(GetObjectType(tile))},
 		{"random", static_cast<uint32_t>(tile.m3())},
 	};
 }
@@ -389,7 +391,7 @@ bool OpenttdrsMaybeExportWorldSemantic(const std::string &source_path)
 	extern SaveLoadVersion _sl_version;
 	json metadata;
 	metadata["kind"] = "metadata";
-	metadata["schema_version"] = 1;
+	metadata["schema_version"] = 2;
 	metadata["contract"] = "world-semantic";
 	metadata["producer"] = "openttd";
 	metadata["stage"] = "after_load_game";
