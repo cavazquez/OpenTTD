@@ -17,6 +17,7 @@
 #include "viewport_func.h"
 #include "command_func.h"
 #include "landscape.h"
+#include "world_draw_export.h"
 #include "void_map.h"
 #include "tgp.h"
 #include "genworld.h"
@@ -435,6 +436,26 @@ void DrawFoundation(TileInfo *ti, Foundation f)
 
 	uint sprite_block = 0;
 	auto [slope, z] = GetFoundationPixelSlope(ti->tile);
+	const bool has_nw = HasFoundationNW(ti->tile, slope, z);
+	const bool has_ne = HasFoundationNE(ti->tile, slope, z);
+
+	/* Las mismas ocho alturas que usan HasFoundationNW/NE. La traza
+	 * conserva los valores antes de reducirlos al booleano para que el
+	 * cliente pueda contrastar orientación y fundamento de cada vecino. */
+	int nw_w_here = z;
+	int nw_n_here = z;
+	GetSlopePixelZOnEdge(slope, DIAGDIR_NW, nw_w_here, nw_n_here);
+	auto [nw_slope, nw_z] = GetFoundationPixelSlope(TileAddXY(ti->tile, 0, -1));
+	int nw_w_neighbour = nw_z;
+	int nw_n_neighbour = nw_z;
+	GetSlopePixelZOnEdge(nw_slope, DIAGDIR_SE, nw_w_neighbour, nw_n_neighbour);
+	int ne_e_here = z;
+	int ne_n_here = z;
+	GetSlopePixelZOnEdge(slope, DIAGDIR_NE, ne_e_here, ne_n_here);
+	auto [ne_slope, ne_z] = GetFoundationPixelSlope(TileAddXY(ti->tile, -1, 0));
+	int ne_e_neighbour = ne_z;
+	int ne_n_neighbour = ne_z;
+	GetSlopePixelZOnEdge(ne_slope, DIAGDIR_SW, ne_e_neighbour, ne_n_neighbour);
 
 	/* Select the needed block of foundations sprites
 	 * Block 0: Walls at NW and NE edge
@@ -442,8 +463,14 @@ void DrawFoundation(TileInfo *ti, Foundation f)
 	 * Block 2: Wall  at NW        edge
 	 * Block 3: No walls at NW or NE edge
 	 */
-	if (!HasFoundationNW(ti->tile, slope, z)) sprite_block += 1;
-	if (!HasFoundationNE(ti->tile, slope, z)) sprite_block += 2;
+	if (!has_nw) sprite_block += 1;
+	if (!has_ne) sprite_block += 2;
+	OpenttdrsWorldDrawRecordFoundation(
+		static_cast<uint8_t>(f), static_cast<uint8_t>(slope),
+		static_cast<uint32_t>(z / TILE_HEIGHT), static_cast<uint8_t>(sprite_block), has_nw, has_ne,
+		nw_w_here, nw_n_here, nw_w_neighbour, nw_n_neighbour,
+		ne_e_here, ne_n_here, ne_e_neighbour, ne_n_neighbour
+	);
 
 	/* Use the original slope sprites if NW and NE borders should be visible */
 	SpriteID leveled_base = (sprite_block == 0 ? (int)SPR_FOUNDATION_BASE : (SPR_SLOPES_VIRTUAL_BASE + sprite_block * TRKFOUND_BLOCK_SIZE));

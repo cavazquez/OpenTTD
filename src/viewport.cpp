@@ -64,6 +64,8 @@
 #include "core/backup_type.hpp"
 #include "landscape.h"
 #include "viewport_func.h"
+#include "world_screenshot_export.h"
+#include "world_draw_export.h"
 #include "station_base.h"
 #include "waypoint_base.h"
 #include "town.h"
@@ -506,6 +508,10 @@ void HandleZoomMessage(Window *w, const Viewport &vp, WidgetID widget_zoom_in, W
  */
 static void AddTileSpriteToDraw(SpriteID image, PaletteID pal, int32_t x, int32_t y, int z, const SubSprite *sub = nullptr, int extra_offs_x = 0, int extra_offs_y = 0)
 {
+	if (OpenttdrsWorldDrawCaptureActive()) {
+		OpenttdrsWorldDrawRecordTileSprite(image, pal, x, y, z, extra_offs_x, extra_offs_y);
+		return;
+	}
 	assert((image & SPRITE_MASK) < MAX_SPRITES);
 
 	TileSpriteToDraw &ts = _vd.tile_sprites_to_draw.emplace_back();
@@ -662,6 +668,20 @@ static void AddCombinedSprite(SpriteID image, PaletteID pal, int x, int y, int z
  */
 void AddSortableSpriteToDraw(SpriteID image, PaletteID pal, int x, int y, int z, const SpriteBounds &bounds, bool transparent, const SubSprite *sub)
 {
+	if (OpenttdrsWorldDrawCaptureActive()) {
+		const auto combine_mode = static_cast<uint8_t>(_vd.combine_sprites);
+		OpenttdrsWorldDrawRecordSortable(image, pal, x, y, z,
+			bounds.origin.x, bounds.origin.y, bounds.origin.z,
+			bounds.extent.x, bounds.extent.y, bounds.extent.z,
+			bounds.offset.x, bounds.offset.y, bounds.offset.z, transparent, combine_mode);
+		if (_vd.combine_sprites != SPRITE_COMBINE_ACTIVE) {
+			/* Mantener el mínimo estado que necesitan foundations y children; no rasterizamos. */
+			_vd.parent_sprites_to_draw.emplace_back();
+			_vd.last_child = LAST_CHILD_PARENT;
+			if (_vd.combine_sprites == SPRITE_COMBINE_PENDING) _vd.combine_sprites = SPRITE_COMBINE_ACTIVE;
+		}
+		return;
+	}
 	int32_t left, right, top, bottom;
 
 	assert((image & SPRITE_MASK) < MAX_SPRITES);
@@ -763,6 +783,7 @@ void AddSortableSpriteToDraw(SpriteID image, PaletteID pal, int x, int y, int z,
  */
 void StartSpriteCombine()
 {
+	if (OpenttdrsWorldDrawCaptureActive()) OpenttdrsWorldDrawRecordCombineStart();
 	assert(_vd.combine_sprites == SPRITE_COMBINE_NONE);
 	_vd.combine_sprites = SPRITE_COMBINE_PENDING;
 }
@@ -773,6 +794,7 @@ void StartSpriteCombine()
  */
 void EndSpriteCombine()
 {
+	if (OpenttdrsWorldDrawCaptureActive()) OpenttdrsWorldDrawRecordCombineEnd();
 	assert(_vd.combine_sprites != SPRITE_COMBINE_NONE);
 	_vd.combine_sprites = SPRITE_COMBINE_NONE;
 }
@@ -823,6 +845,10 @@ bool IsInsideRotatedRectangle(int x, int y)
  */
 void AddChildSpriteScreen(SpriteID image, PaletteID pal, int x, int y, bool transparent, const SubSprite *sub, bool scale, bool relative)
 {
+	if (OpenttdrsWorldDrawCaptureActive()) {
+		OpenttdrsWorldDrawRecordChild(image, pal, x, y, transparent, scale, relative);
+		return;
+	}
 	assert((image & SPRITE_MASK) < MAX_SPRITES);
 
 	/* If the ParentSprite was clipped by the viewport bounds, do not draw the ChildSprites either */
@@ -1317,6 +1343,65 @@ static void ViewportAddLandscape()
 			}
 		}
 	}
+}
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * Ejecuta los `draw_tile_proc` reales sin framebuffer ni clipping. Está
+ * pensado para el exportador de paridad: no incluye vehículos, labels ni UI.
+ */
+bool OpenttdrsCaptureWorldDraw()
+{
+	OpenttdrsWorldDrawBounds bounds;
+	if (!OpenttdrsWorldDrawCaptureBounds(bounds)) return true;
+
+	_vd = {};
+	/* Algunos draw procs (por ejemplo carretera) consultan `_cur_dpi->zoom`.
+	 * El servidor dedicado no tiene framebuffer, pero para la selección de
+	 * sprites basta un viewport lógico enorme, sin clipping. */
+	_vd.dpi.left = -1000000000;
+	_vd.dpi.top = -1000000000;
+	_vd.dpi.width = 2000000000;
+	_vd.dpi.height = 2000000000;
+	_vd.dpi.zoom = ZoomLevel::Normal;
+	AutoRestoreBackup dpi_backup(_cur_dpi, &_vd.dpi);
+	_vd.combine_sprites = SPRITE_COMBINE_NONE;
+	_vd.last_child = LAST_CHILD_NONE;
+	for (uint32_t y = bounds.begin_y; y < bounds.end_y; y++) {
+		for (uint32_t x = bounds.begin_x; x < bounds.end_x; x++) {
+			_cur_ti.tile = TileXY(x, y);
+			_cur_ti.x = static_cast<int>(x * TILE_SIZE);
+			_cur_ti.y = static_cast<int>(y * TILE_SIZE);
+			std::tie(_cur_ti.tileh, _cur_ti.z) = GetTilePixelSlope(_cur_ti.tile);
+			auto [raw_tileh, raw_z] = GetTileSlopeZ(_cur_ti.tile);
+			auto [foundation_tileh, foundation_z] = GetFoundationSlope(_cur_ti.tile);
+			_vd.foundation_part = FOUNDATION_PART_NONE;
+			_vd.foundation[0] = -1;
+			_vd.foundation[1] = -1;
+			_vd.last_foundation_child[0] = LAST_CHILD_NONE;
+			_vd.last_foundation_child[1] = LAST_CHILD_NONE;
+			OpenttdrsWorldDrawBeginTile(x, y, static_cast<uint8_t>(GetTileType(_cur_ti.tile)),
+				static_cast<uint8_t>(raw_tileh), static_cast<uint32_t>(raw_z),
+				static_cast<uint8_t>(foundation_tileh), static_cast<uint32_t>(foundation_z));
+			_tile_type_procs[GetTileType(_cur_ti.tile)]->draw_tile_proc(&_cur_ti);
+			OpenttdrsWorldDrawEndTile();
+		}
+	}
+
+	_vd.tile_sprites_to_draw.clear();
+	_vd.parent_sprites_to_draw.clear();
+	_vd.parent_sprites_to_sort.clear();
+	_vd.child_screen_sprites_to_draw.clear();
+	return OpenttdrsFinishWorldDraw();
 }
 
 /**
@@ -1829,7 +1914,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	AutoRestoreBackup dpi_backup(_cur_dpi, &_vd.dpi);
 
 	ViewportAddLandscape();
-	ViewportAddVehicles(&_vd.dpi);
+	if (!OpenttdrsWorldScreenshotHideVehicles()) ViewportAddVehicles(&_vd.dpi);
 
 	ViewportAddKdtreeSigns(&_vd.dpi);
 

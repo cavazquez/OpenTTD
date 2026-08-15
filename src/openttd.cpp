@@ -7,6 +7,7 @@
 
 /** @file openttd.cpp Functions related to starting OpenTTD. */
 
+#include "snapshot_export.h"
 #include "stdafx.h"
 
 #include "blitter/factory.hpp"
@@ -1280,6 +1281,8 @@ void StateGameLoop()
 		CallWindowGameTickEvent();
 		NewsLoop();
 		cur_company.Restore();
+	OpenttdrsMaybeExportPbsTraceTick();
+	OpenttdrsMaybeExportAirportFtaTraceTick();
 	}
 
 	assert(IsLocalCompany());

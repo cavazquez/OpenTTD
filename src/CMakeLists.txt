@@ -123,6 +123,10 @@ add_files(
     company_type.h
     console.cpp
     console_cmds.cpp
+    world_screenshot_export.cpp
+    world_draw_export.cpp
+    world_semantic_export.cpp
+    snapshot_export.cpp
     console_func.h
     console_gui.cpp
     console_gui.h
